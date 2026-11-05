@@ -142,7 +142,7 @@ func New(cfg config.Config) (*fiber.App, *gorm.DB, error) {
 	examService := exams.NewService(database.NewExamRepository(db), classRepository, assignmentRepository, database.NewTopicCourseSource(topicRepository), attemptService, performanceService, contentCache)
 
 	routes.Register(app, routes.Handlers{
-		Auth:        handlers.NewAuthHandler(userService, sessionService, workflows.NewStudentRegistrar(db), &cfg.JWTSecret, cfg.JWTExpiration),
+		Auth:        handlers.NewAuthHandler(userService, sessionService, workflows.NewStudentRegistrar(db), &cfg.JWTSecret, cfg.JWTExpiration, cfg.StatelessAuth),
 		User:        handlers.NewUserHandler(userService),
 		School:      handlers.NewSchoolHandler(schoolService, workflows.NewSchoolStarter(db)),
 		Campus:      handlers.NewCampusHandler(campusService),
@@ -170,7 +170,7 @@ func New(cfg config.Config) (*fiber.App, *gorm.DB, error) {
 		Access:          accessRepository,
 		ContentScope:    scopeRepository,
 		ResourceScope:   scopeRepository,
-		Auth:            apiMiddleware.Auth(cfg.JWTSecret, sessionService),
+		Auth:            apiMiddleware.Auth(cfg.JWTSecret, sessionService, cfg.StatelessAuth),
 		LoginRate:       limiter.New(limiter.Config{Max: 10, Expiration: cfg.RateWindow}),
 		PerformanceRate: limiter.New(limiter.Config{Max: cfg.PerformanceRateLimit, Expiration: cfg.RateWindow}),
 	})

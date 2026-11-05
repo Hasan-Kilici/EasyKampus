@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 
 	"lms/backend/internal/api/middleware"
 	"lms/backend/internal/workflows"
@@ -19,6 +20,7 @@ type AuthHandler struct {
 	registrar  workflows.StudentRegistrar
 	jwtSecret  *string
 	expiration time.Duration
+	stateless  bool
 }
 
 func NewAuthHandler(
@@ -27,6 +29,7 @@ func NewAuthHandler(
 	registrar workflows.StudentRegistrar,
 	jwtSecret *string,
 	expiration time.Duration,
+	stateless bool,
 ) *AuthHandler {
 	return &AuthHandler{
 		users:      userService,
@@ -34,6 +37,7 @@ func NewAuthHandler(
 		registrar:  registrar,
 		jwtSecret:  jwtSecret,
 		expiration: expiration,
+		stateless:  stateless,
 	}
 }
 
@@ -115,14 +119,20 @@ func (handler *AuthHandler) Login(c *fiber.Ctx) error {
 		return writeDomainError(c, err)
 	}
 
-	session, err := handler.sessions.Create(
-		c.UserContext(),
-		user.ID,
-		c.Get(fiber.HeaderUserAgent),
-		handler.expiration,
-	)
-	if err != nil {
-		return writeDomainError(c, err)
+	var sessionID uuid.UUID
+	if handler.stateless {
+		sessionID = uuid.New()
+	} else {
+		session, err := handler.sessions.Create(
+			c.UserContext(),
+			user.ID,
+			c.Get(fiber.HeaderUserAgent),
+			handler.expiration,
+		)
+		if err != nil {
+			return writeDomainError(c, err)
+		}
+		sessionID = session.ID
 	}
 
 	role := string(user.Role)
@@ -130,7 +140,7 @@ func (handler *AuthHandler) Login(c *fiber.Ctx) error {
 	token, err := core.CreateToken(
 		*handler.jwtSecret,
 		user.ID,
-		session.ID,
+		sessionID,
 		role,
 		handler.expiration,
 	)

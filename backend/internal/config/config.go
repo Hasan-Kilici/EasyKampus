@@ -15,6 +15,7 @@ type Config struct {
 	Environment              string
 	Port                     string
 	DatabasePath             string
+	StatelessAuth            bool
 	JWTSecret                string
 	JWTExpiration            time.Duration
 	CORSOrigins              []string
@@ -160,6 +161,7 @@ func Load() (Config, error) {
 		Environment:              os.Getenv("APP_ENV"),
 		Port:                     port,
 		DatabasePath:             databasePath,
+		StatelessAuth:            os.Getenv("VERCEL") != "",
 		JWTSecret:                secret,
 		JWTExpiration:            expiration,
 		CORSOrigins:              origins,

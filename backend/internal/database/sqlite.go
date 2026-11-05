@@ -3,6 +3,10 @@ package database
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -53,6 +57,9 @@ func sqliteDSN(path string) string {
 }
 
 func Open(cfg config.Config) (*gorm.DB, error) {
+	if err := prepareDatabasePath(cfg.DatabasePath); err != nil {
+		return nil, err
+	}
 	db, err := gorm.Open(sqlite.Open(sqliteDSN(cfg.DatabasePath)), &gorm.Config{})
 	if err != nil {
 		return nil, err
@@ -71,6 +78,65 @@ func Open(cfg config.Config) (*gorm.DB, error) {
 	}
 
 	return db, nil
+}
+
+func prepareDatabasePath(path string) error {
+	if !strings.HasPrefix(filepath.ToSlash(path), "/tmp/") {
+		return nil
+	}
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	candidates := []string{}
+	if seed := strings.TrimSpace(os.Getenv("DATABASE_SEED_PATH")); seed != "" {
+		candidates = append(candidates, seed)
+	}
+	if workingDirectory, err := os.Getwd(); err == nil {
+		candidates = append(candidates,
+			filepath.Join(workingDirectory, "lms.db"),
+			filepath.Join(workingDirectory, "backend", "lms.db"),
+		)
+	}
+	candidates = append(candidates, "/var/task/lms.db", "/var/task/backend/lms.db")
+
+	for _, source := range candidates {
+		info, err := os.Stat(source)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if info.Size() == 0 || filepath.Clean(source) == filepath.Clean(path) {
+			continue
+		}
+		if err := copyDatabase(source, path); err != nil {
+			return fmt.Errorf("copy database seed %q to %q: %w", source, path, err)
+		}
+		return nil
+	}
+	return nil
+}
+
+func copyDatabase(source, destination string) error {
+	input, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer input.Close()
+
+	output, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	if _, err := io.Copy(output, input); err != nil {
+		return err
+	}
+	return output.Sync()
 }
 
 func configureSQLite(db *gorm.DB) error {

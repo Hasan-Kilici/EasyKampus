@@ -37,7 +37,7 @@ type ClassResolver interface {
 	OwnerIDForResource(ctx context.Context, resource string, id uuid.UUID) (uuid.UUID, error)
 }
 
-func Auth(secret string, sessionService sessions.Service) fiber.Handler {
+func Auth(secret string, sessionService sessions.Service, stateless bool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		header := c.Get(fiber.HeaderAuthorization)
 		parts := strings.Fields(header)
@@ -53,16 +53,24 @@ func Auth(secret string, sessionService sessions.Service) fiber.Handler {
 		if err != nil {
 			return fiber.ErrUnauthorized
 		}
-		session, err := sessionService.GetActive(c.UserContext(), claims.SessionID)
-		if err != nil || session.UserID != userID {
-			return fiber.ErrUnauthorized
+		if !stateless {
+			session, err := sessionService.GetActive(c.UserContext(), claims.SessionID)
+			if err != nil || session.UserID != userID {
+				return fiber.ErrUnauthorized
+			}
+			c.Locals(SessionIDLocal, session.ID)
+		} else {
+			sessionID, err := uuid.Parse(claims.SessionID)
+			if err != nil {
+				return fiber.ErrUnauthorized
+			}
+			c.Locals(SessionIDLocal, sessionID)
 		}
 		role := users.Role(claims.Role)
 		if !role.IsValid() {
 			return fiber.ErrUnauthorized
 		}
 		c.Locals(UserIDLocal, userID)
-		c.Locals(SessionIDLocal, session.ID)
 		c.Locals(RoleLocal, role)
 		return c.Next()
 	}
