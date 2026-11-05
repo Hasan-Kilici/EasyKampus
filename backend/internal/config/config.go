@@ -15,6 +15,8 @@ type Config struct {
 	Environment              string
 	Port                     string
 	DatabasePath             string
+	TursoDatabaseURL         string
+	TursoAuthToken           string
 	StatelessAuth            bool
 	JWTSecret                string
 	JWTExpiration            time.Duration
@@ -161,6 +163,8 @@ func Load() (Config, error) {
 		Environment:              os.Getenv("APP_ENV"),
 		Port:                     port,
 		DatabasePath:             databasePath,
+		TursoDatabaseURL:         strings.TrimRight(strings.TrimSpace(os.Getenv("TURSO_DATABASE_URL")), "/"),
+		TursoAuthToken:           strings.TrimSpace(os.Getenv("TURSO_AUTH_TOKEN")),
 		StatelessAuth:            os.Getenv("VERCEL") != "",
 		JWTSecret:                secret,
 		JWTExpiration:            expiration,

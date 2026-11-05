@@ -5,12 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/glebarez/sqlite"
+	_ "github.com/tursodatabase/libsql-client-go/libsql"
 	"gorm.io/gorm"
 
 	"lms/backend/internal/config"
@@ -57,9 +59,13 @@ func sqliteDSN(path string) string {
 }
 
 func Open(cfg config.Config) (*gorm.DB, error) {
+	if cfg.TursoDatabaseURL != "" {
+		return openTurso(cfg)
+	}
 	if err := prepareDatabasePath(cfg.DatabasePath); err != nil {
 		return nil, err
 	}
+
 	db, err := gorm.Open(sqlite.Open(sqliteDSN(cfg.DatabasePath)), &gorm.Config{})
 	if err != nil {
 		return nil, err
@@ -77,6 +83,38 @@ func Open(cfg config.Config) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	return db, nil
+}
+
+func openTurso(cfg config.Config) (*gorm.DB, error) {
+	if cfg.TursoAuthToken == "" {
+		return nil, fmt.Errorf("TURSO_AUTH_TOKEN is required when TURSO_DATABASE_URL is set")
+	}
+	dsn, err := url.Parse(cfg.TursoDatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid TURSO_DATABASE_URL: %w", err)
+	}
+	query := dsn.Query()
+	query.Set("authToken", cfg.TursoAuthToken)
+	dsn.RawQuery = query.Encode()
+
+	sqlDB, err := sql.Open("libsql", dsn.String())
+	if err != nil {
+		return nil, err
+	}
+	sqlDB.SetMaxOpenConns(4)
+	sqlDB.SetMaxIdleConns(4)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	sqlDB.SetConnMaxLifetime(0)
+	if err := sqlDB.Ping(); err != nil {
+		_ = sqlDB.Close()
+		return nil, fmt.Errorf("connect to Turso: %w", err)
+	}
+	db, err := gorm.Open(&sqlite.Dialector{Conn: sqlDB}, &gorm.Config{})
+	if err != nil {
+		_ = sqlDB.Close()
+		return nil, err
+	}
 	return db, nil
 }
 
