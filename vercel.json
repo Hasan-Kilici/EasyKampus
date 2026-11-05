@@ -1,0 +1,44 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "frontend": {
+      "root": "frontend",
+      "framework": "sveltekit"
+    },
+    "backend": {
+      "root": "backend",
+      "framework": "go"
+    },
+    "performance": {
+      "root": "performance",
+      "framework": "fastapi",
+      "entrypoint": "app.main:app"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/analyze/(.*)",
+      "destination": {
+        "service": "performance"
+      }
+    },
+    {
+      "source": "/api/health",
+      "destination": {
+        "service": "performance"
+      }
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
+    }
+  ]
+}
