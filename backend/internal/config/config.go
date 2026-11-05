@@ -17,6 +17,7 @@ type Config struct {
 	DatabasePath             string
 	TursoDatabaseURL         string
 	TursoAuthToken           string
+	RunMigrations            bool
 	StatelessAuth            bool
 	JWTSecret                string
 	JWTExpiration            time.Duration
@@ -165,6 +166,7 @@ func Load() (Config, error) {
 		DatabasePath:             databasePath,
 		TursoDatabaseURL:         strings.TrimRight(strings.TrimSpace(os.Getenv("TURSO_DATABASE_URL")), "/"),
 		TursoAuthToken:           strings.TrimSpace(os.Getenv("TURSO_AUTH_TOKEN")),
+		RunMigrations:            os.Getenv("RUN_MIGRATIONS") == "true" || os.Getenv("VERCEL") == "",
 		StatelessAuth:            os.Getenv("VERCEL") != "",
 		JWTSecret:                secret,
 		JWTExpiration:            expiration,

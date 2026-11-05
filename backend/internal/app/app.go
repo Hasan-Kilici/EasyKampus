@@ -48,8 +48,10 @@ func New(cfg config.Config) (*fiber.App, *gorm.DB, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := database.Migrate(db); err != nil {
-		return nil, db, err
+	if cfg.RunMigrations {
+		if err := database.Migrate(db); err != nil {
+			return nil, db, err
+		}
 	}
 	if err := database.EnsureSuperAdmin(context.Background(), db, cfg.SuperAdminEmail, cfg.SuperAdminPassword); err != nil {
 		return nil, db, err
